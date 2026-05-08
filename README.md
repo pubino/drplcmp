@@ -28,8 +28,26 @@ python3 revision_finder.py BACKUP_A.sql BACKUP_B.sql \
 | `-l / --limit N`           | Restrict the printed list of node ids to `N`. |
 | `--diff NID`               | Show a colorful unified diff for one specific node id. |
 | `--diff-all`               | Show colorful diffs for every identified node id. |
+| `-f / --format FORMAT`     | `plain` (default) · `table` · `json` · `proof` — see below. |
 | `--no-color`               | Disable ANSI color (auto-disabled when stdout is not a tty). |
+| `-V / --version`           | Print the tool version. |
 | `-h / --help`              | Full argparse help. |
+
+### Output formats
+
+* `plain` — the default: a one-line summary or `Differing node ids:` followed
+  by one nid per line. Compatible with classic shell pipelines.
+* `table` — a Unicode box-drawing table (NID, status, titles, changed
+  timestamps) for visual scanning.
+* `json` — a structured payload with the parameters, node ids, statuses, and
+  full row dicts from each backup. Suitable for piping to `jq`.
+* `proof` — a tamper-evident JSON manifest. Includes SHA-256 digests of both
+  input files, the parameters, the result node ids, a SHA-256 over the
+  canonical encoding of the per-node row pairs, and a top-level
+  `proof_sha256` computed deterministically over `inputs+parameters+result`
+  (excluding clock- and path-dependent metadata). Two runs against the same
+  inputs and parameters produce the same `proof_sha256`, so the manifest can
+  be archived as evidence and independently re-verified later.
 
 ### Validation behavior
 

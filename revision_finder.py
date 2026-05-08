@@ -13,12 +13,15 @@ from __future__ import annotations
 import argparse
 import difflib
 import hashlib
+import json
 import os
 import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Iterator, Optional
+from typing import Any, Iterable, Iterator, Optional
+
+__version__ = "1.1.0"
 
 # ---------------------------------------------------------------------------
 # ANSI color codes (no third-party dependency).
@@ -570,6 +573,247 @@ def render_diff(
 
 
 # ---------------------------------------------------------------------------
+# Output format renderers
+# ---------------------------------------------------------------------------
+OUTPUT_FORMATS = ("plain", "table", "json", "proof")
+
+
+def _classify(nid: int, map_a: dict, map_b: dict) -> str:
+    a = map_a.get(nid)
+    b = map_b.get(nid)
+    if a is None and b is not None:
+        return "added"
+    if b is None and a is not None:
+        return "removed"
+    return "modified"
+
+
+def _fmt_unix_ts(value: Any) -> str:
+    if value in (None, ""):
+        return "—"
+    try:
+        return datetime.fromtimestamp(int(value), tz=timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _truncate(s: Any, n: int) -> str:
+    s = "—" if s is None else str(s)
+    if len(s) <= n:
+        return s
+    return s[: max(1, n - 1)] + "…"
+
+
+def render_plain(
+    nids: list[int],
+    map_a: dict,
+    map_b: dict,
+    args: argparse.Namespace,
+    data_a: DumpData,
+    data_b: DumpData,
+) -> str:
+    if not nids:
+        return "no differing node ids found in window"
+    lines = ["Differing node ids:"]
+    for nid in nids:
+        lines.append(f"  {nid}")
+    return "\n".join(lines)
+
+
+def _format_box_table(headers: list[str], rows: list[list[str]]) -> str:
+    cols = len(headers)
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            widths[i] = max(widths[i], len(cell))
+
+    def hline(left: str, mid: str, right: str) -> str:
+        parts = ["─" * (w + 2) for w in widths]
+        return left + mid.join(parts) + right
+
+    def row_line(cells: list[str]) -> str:
+        return (
+            "│"
+            + "│".join(
+                f" {cells[i].ljust(widths[i])} " for i in range(cols)
+            )
+            + "│"
+        )
+
+    out = [
+        hline("┌", "┬", "┐"),
+        row_line(headers),
+        hline("├", "┼", "┤"),
+    ]
+    for row in rows:
+        out.append(row_line(row))
+    out.append(hline("└", "┴", "┘"))
+    return "\n".join(out)
+
+
+def render_table(
+    nids: list[int],
+    map_a: dict,
+    map_b: dict,
+    args: argparse.Namespace,
+    data_a: DumpData,
+    data_b: DumpData,
+) -> str:
+    if not nids:
+        return "no differing node ids found in window"
+    headers = ["NID", "Status", "Title (A)", "Title (B)", "Changed (A)", "Changed (B)"]
+    rows: list[list[str]] = []
+    for nid in nids:
+        a = map_a.get(nid) or {}
+        b = map_b.get(nid) or {}
+        rows.append(
+            [
+                str(nid),
+                _classify(nid, map_a, map_b),
+                _truncate(a.get("title"), 36),
+                _truncate(b.get("title"), 36),
+                _fmt_unix_ts(a.get("changed")),
+                _fmt_unix_ts(b.get("changed")),
+            ]
+        )
+    summary = (
+        f"{len(nids)} differing node id(s) "
+        f"for content type {args.content_type!r} "
+        f"in [{args.start.date()}, {args.end.date()}]"
+    )
+    return summary + "\n" + _format_box_table(headers, rows)
+
+
+def render_json(
+    nids: list[int],
+    map_a: dict,
+    map_b: dict,
+    args: argparse.Namespace,
+    data_a: DumpData,
+    data_b: DumpData,
+) -> str:
+    payload = {
+        "tool": "revision_finder",
+        "version": __version__,
+        "parameters": {
+            "content_type": args.content_type,
+            "start": args.start.isoformat(),
+            "end": args.end.isoformat(),
+            "limit": args.limit,
+        },
+        "count": len(nids),
+        "node_ids": list(nids),
+        "items": [
+            {
+                "nid": nid,
+                "status": _classify(nid, map_a, map_b),
+                "row_a": map_a.get(nid),
+                "row_b": map_b.get(nid),
+            }
+            for nid in nids
+        ],
+    }
+    return json.dumps(payload, indent=2, sort_keys=True, default=str)
+
+
+def _canonical_json(obj: Any) -> str:
+    """Deterministic JSON encoding suitable for hashing."""
+    return json.dumps(
+        obj, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False
+    )
+
+
+def build_proof_manifest(
+    nids: list[int],
+    map_a: dict,
+    map_b: dict,
+    args: argparse.Namespace,
+    data_a: DumpData,
+    data_b: DumpData,
+) -> dict:
+    """Return a tamper-evident manifest of inputs, parameters, and result.
+
+    ``proof_sha256`` is computed over a canonical JSON encoding of the
+    proof-relevant subset (input file digests + parameters + result),
+    excluding clock-dependent or path-dependent metadata so that anyone
+    re-running the tool with identical inputs and parameters can reproduce
+    the same proof_sha256 byte-for-byte.
+    """
+    items = [
+        {"nid": nid, "a": map_a.get(nid), "b": map_b.get(nid)} for nid in nids
+    ]
+    rows_canonical = _canonical_json(items)
+    rows_sha256 = hashlib.sha256(rows_canonical.encode("utf-8")).hexdigest()
+
+    proof_input = {
+        "inputs": {
+            "file_a_sha256": data_a.sha256,
+            "file_b_sha256": data_b.sha256,
+        },
+        "parameters": {
+            "content_type": args.content_type,
+            "start": args.start.isoformat(),
+            "end": args.end.isoformat(),
+            "limit": args.limit,
+        },
+        "result": {
+            "count": len(nids),
+            "node_ids": list(nids),
+            "rows_canonical_sha256": rows_sha256,
+        },
+    }
+    canonical = _canonical_json(proof_input)
+    proof_sha256 = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def file_info(d: DumpData) -> dict:
+        return {
+            "path": str(d.path),
+            "sha256": d.sha256,
+            "size": d.path.stat().st_size,
+            "mtime": d.mtime,
+        }
+
+    return {
+        "tool": "revision_finder",
+        "version": __version__,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "inputs": {"file_a": file_info(data_a), "file_b": file_info(data_b)},
+        "parameters": proof_input["parameters"],
+        "result": {
+            **proof_input["result"],
+            "items": items,
+        },
+        "proof_sha256": proof_sha256,
+    }
+
+
+def render_proof(
+    nids: list[int],
+    map_a: dict,
+    map_b: dict,
+    args: argparse.Namespace,
+    data_a: DumpData,
+    data_b: DumpData,
+) -> str:
+    return json.dumps(
+        build_proof_manifest(nids, map_a, map_b, args, data_a, data_b),
+        indent=2,
+        sort_keys=True,
+        default=str,
+    )
+
+
+_RENDERERS = {
+    "plain": render_plain,
+    "table": render_table,
+    "json": render_json,
+    "proof": render_proof,
+}
+
+
+# ---------------------------------------------------------------------------
 # Validation orchestration
 # ---------------------------------------------------------------------------
 class ValidationError(Exception):
@@ -704,6 +948,24 @@ def build_argparser() -> argparse.ArgumentParser:
         action="store_true",
         help="disable ANSI color in output (auto-disabled when stdout is not a tty)",
     )
+    parser.add_argument(
+        "-f",
+        "--format",
+        dest="output_format",
+        choices=OUTPUT_FORMATS,
+        default="plain",
+        help=(
+            "result format: plain (list), table (pretty box), json (structured), "
+            "proof (tamper-evident JSON manifest with deterministic SHA-256 over "
+            "input digests + parameters + result)"
+        ),
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
     return parser
 
 
@@ -729,49 +991,44 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     limited = nids[: args.limit] if args.limit else nids
 
-    if not limited:
-        print("no differing node ids found in window")
-        return 0
+    renderer = _RENDERERS[args.output_format]
+    print(renderer(limited, map_a, map_b, args, data_a, data_b))
 
-    print("Differing node ids:")
-    for nid in limited:
-        print(f"  {nid}")
-
-    label_a = str(args.file_a)
-    label_b = str(args.file_b)
-
-    if args.diff is not None:
-        if args.diff not in limited:
-            print(
-                f"\nnote: nid {args.diff} is not in the differing set "
-                "(showing diff anyway if data exists)",
-                file=sys.stderr,
-            )
-        print()
-        print(
-            render_diff(
-                args.diff,
-                label_a,
-                label_b,
-                map_a.get(args.diff),
-                map_b.get(args.diff),
-                use_color,
-            )
-        )
-
-    if args.diff_all:
-        for nid in limited:
+    # Textual unified diffs only make sense for human-readable formats.
+    if args.output_format in ("plain", "table"):
+        label_a = str(args.file_a)
+        label_b = str(args.file_b)
+        if args.diff is not None:
+            if args.diff not in limited:
+                print(
+                    f"\nnote: nid {args.diff} is not in the differing set "
+                    "(showing diff anyway if data exists)",
+                    file=sys.stderr,
+                )
             print()
             print(
                 render_diff(
-                    nid,
+                    args.diff,
                     label_a,
                     label_b,
-                    map_a.get(nid),
-                    map_b.get(nid),
+                    map_a.get(args.diff),
+                    map_b.get(args.diff),
                     use_color,
                 )
             )
+        if args.diff_all:
+            for nid in limited:
+                print()
+                print(
+                    render_diff(
+                        nid,
+                        label_a,
+                        label_b,
+                        map_a.get(nid),
+                        map_b.get(nid),
+                        use_color,
+                    )
+                )
 
     return 0
 

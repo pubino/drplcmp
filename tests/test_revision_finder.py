@@ -402,6 +402,134 @@ def test_cli_rejects_bad_machine_name(capsys):
         )
 
 
+def test_cli_format_table(capsys):
+    rf.main(
+        [
+            str(BACKUP_A),
+            str(BACKUP_B),
+            "--type",
+            "article",
+            "--start",
+            "2025-01-01",
+            "--end",
+            "2025-01-03",
+            "--format",
+            "table",
+            "--no-color",
+        ]
+    )
+    out = capsys.readouterr().out
+    # Box-drawing characters and the column headers should be present.
+    assert "┌" in out and "┐" in out and "└" in out
+    assert "NID" in out and "Status" in out
+    assert "modified" in out  # nid 1 has different title
+    assert "added" in out  # nid 4 only in B
+
+
+def test_cli_format_json_is_valid(capsys):
+    import json as _json
+
+    rf.main(
+        [
+            str(BACKUP_A),
+            str(BACKUP_B),
+            "--type",
+            "article",
+            "--start",
+            "2025-01-01",
+            "--end",
+            "2025-01-03",
+            "--format",
+            "json",
+            "--no-color",
+        ]
+    )
+    out = capsys.readouterr().out
+    payload = _json.loads(out)
+    assert payload["count"] == 2
+    assert payload["node_ids"] == [1, 4]
+    statuses = {item["nid"]: item["status"] for item in payload["items"]}
+    assert statuses == {1: "modified", 4: "added"}
+
+
+def test_cli_format_proof_has_deterministic_hash(capsys):
+    import json as _json
+
+    def run_proof():
+        rf.main(
+            [
+                str(BACKUP_A),
+                str(BACKUP_B),
+                "--type",
+                "article",
+                "--start",
+                "2025-01-01",
+                "--end",
+                "2025-01-03",
+                "--format",
+                "proof",
+                "--no-color",
+            ]
+        )
+        return _json.loads(capsys.readouterr().out)
+
+    p1 = run_proof()
+    p2 = run_proof()
+
+    # generated_at is metadata and may differ across runs, but the
+    # proof_sha256 covers only inputs+parameters+result, so it must be
+    # byte-stable for identical inputs.
+    assert p1["proof_sha256"] == p2["proof_sha256"]
+    assert len(p1["proof_sha256"]) == 64  # hex sha256
+    assert p1["result"]["count"] == 2
+    assert p1["inputs"]["file_a"]["sha256"]
+    assert p1["inputs"]["file_b"]["sha256"]
+    assert p1["inputs"]["file_a"]["sha256"] != p1["inputs"]["file_b"]["sha256"]
+
+
+def test_cli_format_proof_changes_when_param_changes(capsys):
+    import json as _json
+
+    rf.main(
+        [
+            str(BACKUP_A),
+            str(BACKUP_B),
+            "--type",
+            "article",
+            "--start",
+            "2025-01-01",
+            "--end",
+            "2025-01-03",
+            "--format",
+            "proof",
+            "--no-color",
+        ]
+    )
+    p1 = _json.loads(capsys.readouterr().out)
+
+    rf.main(
+        [
+            str(BACKUP_A),
+            str(BACKUP_B),
+            "--type",
+            "article",
+            "--start",
+            "2025-01-01",
+            "--end",
+            "2025-01-03",
+            "--limit",
+            "1",
+            "--format",
+            "proof",
+            "--no-color",
+        ]
+    )
+    p2 = _json.loads(capsys.readouterr().out)
+
+    # Different limit -> different result -> different proof.
+    assert p1["proof_sha256"] != p2["proof_sha256"]
+
+
 def test_cli_rejects_same_file(capsys):
     code = rf.main(
         [
