@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Opt into Node.js 24 runner ahead of the 2026-06-02 hard cutover so the
+# JavaScript-based actions (actions/checkout, actions/setup-python) keep
+# running cleanly without deprecation warnings.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   test-native:
     name: pytest (Python ${{ matrix.python }})
