@@ -1,11 +1,50 @@
+# --- Python bytecode / packaging ---
 __pycache__/
-*.pyc
-*.pyo
-.pytest_cache/
-.venv/
-.env
+*.py[cod]
+*$py.class
+*.egg
 *.egg-info/
+build/
+dist/
+wheels/
+pip-wheel-metadata/
+
+# --- Virtualenvs ---
+.venv/
+venv/
+env/
+.python-version
+
+# --- Tooling caches / coverage ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- IDE / editor ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- OS cruft ---
 .DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# --- Claude / local notes (do not commit) ---
 .claude/
 CLAUDE.md
 PROMPT.md
