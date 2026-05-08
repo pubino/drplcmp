@@ -41,9 +41,11 @@ python3 drplcmp.py BACKUP_A.sql BACKUP_B.sql \
   input files, the parameters, the result node ids, a SHA-256 over the
   canonical encoding of the per-node row pairs, and a top-level
   `proof_sha256` computed deterministically over `inputs+parameters+result`
-  (excluding clock- and path-dependent metadata). Two runs against the same
-  inputs and parameters produce the same `proof_sha256`, so the manifest can
-  be archived as evidence and independently re-verified later.
+  (excluding clock- and path-dependent metadata, as well as the `tool` and
+  `version` strings — so a project rename or version bump does not invalidate
+  previously archived hashes). Two runs against the same inputs and
+  parameters produce the same `proof_sha256`, so the manifest can be
+  archived as evidence and independently re-verified later.
 
 ### Validation behavior
 
@@ -80,7 +82,7 @@ python3 -m venv .venv
 .venv/bin/python -m pytest -v tests/
 ```
 
-### Containerized (recommended for CI parity)
+### Container for CI Parity
 
 ```bash
 ./bin/run-tests.sh         # builds the image and runs pytest inside it
