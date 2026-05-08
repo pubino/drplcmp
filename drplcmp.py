@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""drplcmp — Find Drupal 10 nodes that differ between two SQL backups.
+"""drplcmp — Find Drupal 10+ nodes that differ between two SQL backups.
 
-Reads two .sql backup files (mysqldump-style) of a Drupal 10 database and
+Reads two .sql backup files (mysqldump-style) of a Drupal 10+ database and
 reports which nodes of a given content type were created, modified, or
 deleted within a supplied [start, end] datetime window.
 
@@ -35,7 +35,7 @@ BLUE = "\033[34m"
 MAGENTA = "\033[35m"
 CYAN = "\033[36m"
 
-# Tables we recognise as part of a Drupal 10 dump.  Two or more of these
+# Tables we recognise as part of a Drupal 10+ dump.  Two or more of these
 # must be present for the file to be accepted as a Drupal backup.
 DRUPAL_SIGNATURE_TABLES = (
     "node",
@@ -885,7 +885,7 @@ def build_argparser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="drplcmp",
         description=(
-            "Find Drupal 10 nodes that differ between two SQL backups within "
+            "Find Drupal 10+ nodes that differ between two SQL backups within "
             "a given content type and time window."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,

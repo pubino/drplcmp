@@ -1,6 +1,6 @@
 # DRPLCMP — Drupal Revision Finder
 
-`drplcmp.py` compares two `.sql` backups of a Drupal 10 database and
+`drplcmp.py` compares two `.sql` backups of a Drupal 10+ database and
 reports the node IDs of a given content type that were created, modified, or
 deleted within a specified UTC datetime window.
 
