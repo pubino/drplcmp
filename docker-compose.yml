@@ -1,0 +1,5 @@
+services:
+  tests:
+    build: .
+    image: revision-finder-tests:latest
+    command: python -m pytest -v tests/

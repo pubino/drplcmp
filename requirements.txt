@@ -1,0 +1,2 @@
+# revision_finder.py runs on the Python 3.10+ standard library only.
+# This file is intentionally empty for clarity in CI environments.
