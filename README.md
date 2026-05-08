@@ -1,13 +1,10 @@
-# revision-finder
+# Drupal Revision Finder
 
 `revision_finder.py` compares two `.sql` backups of a Drupal 10 database and
-reports the **node IDs of a given content type that were created, modified, or
-deleted within a specified UTC datetime window**.
+reports the node IDs of a given content type that were created, modified, or
+deleted within a specified UTC datetime window.
 
-The script is pure Python (3.10+) standard library — no third-party runtime
-dependencies. It does not execute SQL or invoke any shell; both backups are
-parsed by a self-contained tokenizer, which makes the tool safe to point at
-untrusted input files.
+Both backups are parsed by a self-contained tokenizer, which makes the tool safe to point at untrusted input files.
 
 ## Usage
 
@@ -35,8 +32,7 @@ python3 revision_finder.py BACKUP_A.sql BACKUP_B.sql \
 
 ### Output formats
 
-* `plain` — the default: a one-line summary or `Differing node ids:` followed
-  by one nid per line. Compatible with classic shell pipelines.
+* `plain` — the default: a one-line summary or `Differing node ids:` followed by one nid per line. Compatible with classic shell pipelines.
 * `table` — a Unicode box-drawing table (NID, status, titles, changed
   timestamps) for visual scanning.
 * `json` — a structured payload with the parameters, node ids, statuses, and
@@ -55,20 +51,16 @@ Before any work is done the script enforces:
 
 1. Both inputs end in `.sql`, exist, and are non-empty.
 2. They are not the same path, and their SHA-256 contents are not identical.
-3. They look like Drupal dumps — at least two known Drupal tables are present
-   (`node_field_data`, `users_field_data`, `key_value`, `config`, …).
-4. They differ by at least one signal: `mysqldump` completion timestamp, file
-   mtime, or file content.
+3. They look like Drupal dumps — at least two known Drupal tables are present (`node_field_data`, `users_field_data`, `key_value`, `config`, …).
+4. They differ by at least one signal: `mysqldump` completion timestamp, file mtime, or file content.
 5. At least one of them contains a node of the requested content type.
-6. The content-type machine name matches `^[a-z][a-z0-9_]{0,31}$` (this rejects
-   shell- or SQL-injection-style strings).
+6. The content-type machine name matches `^[a-z][a-z0-9_]{0,31}$` (this rejects shell- or SQL-injection-style strings).
 
-If any check fails the script prints an `error: …` line to `stderr` and exits
-with status `2`.
+If any check fails the script prints an `error: …` line to `stderr` and exits with status `2`.
 
-## How a node qualifies as “differing”
+## How a node qualifies
 
-A node id is reported when **all** of the following hold:
+A node qualifies when all of the following are true:
 
 * It carries `type = <machine_name>` in at least one of the two backups.
 * Its `changed` timestamp in at least one backup falls within `[start, end]`.
@@ -98,7 +90,3 @@ docker-compose run --rm tests
 
 GitHub Actions (`.github/workflows/ci.yml`) runs both the native matrix
 (Python 3.10/3.11/3.12) and the Dockerized job on every push / PR.
-
-## License
-
-See `LICENSE.md`.
