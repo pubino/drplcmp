@@ -36,6 +36,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build test image
-        run: docker build -t revision-finder-tests:ci .
+        run: docker build -t drplcmp-tests:ci .
       - name: Run tests in container
-        run: docker run --rm revision-finder-tests:ci
+        run: docker run --rm drplcmp-tests:ci

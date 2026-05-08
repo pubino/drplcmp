@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""revision_finder — Find Drupal 10 nodes that differ between two SQL backups.
+"""drplcmp — Find Drupal 10 nodes that differ between two SQL backups.
 
 Reads two .sql backup files (mysqldump-style) of a Drupal 10 database and
 reports which nodes of a given content type were created, modified, or
@@ -695,7 +695,7 @@ def render_json(
     data_b: DumpData,
 ) -> str:
     payload = {
-        "tool": "revision_finder",
+        "tool": "drplcmp",
         "version": __version__,
         "parameters": {
             "content_type": args.content_type,
@@ -776,7 +776,7 @@ def build_proof_manifest(
         }
 
     return {
-        "tool": "revision_finder",
+        "tool": "drplcmp",
         "version": __version__,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "inputs": {"file_a": file_info(data_a), "file_b": file_info(data_b)},
@@ -883,7 +883,7 @@ def validate_inputs(
 # ---------------------------------------------------------------------------
 def build_argparser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="revision_finder",
+        prog="drplcmp",
         description=(
             "Find Drupal 10 nodes that differ between two SQL backups within "
             "a given content type and time window."

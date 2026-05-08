@@ -1,4 +1,4 @@
-"""Unit and integration tests for revision_finder.py.
+"""Unit and integration tests for drplcmp.py.
 
 Uses tiny mock .sql fixtures under tests/fixtures/. No real database is
 touched; the SQL files are parsed directly.
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-import revision_finder as rf
+import drplcmp as rf
 
 FIXTURES = Path(__file__).parent / "fixtures"
 BACKUP_A = FIXTURES / "backup_a.sql"

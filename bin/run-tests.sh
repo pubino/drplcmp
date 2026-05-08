@@ -10,6 +10,6 @@ if command -v docker-compose >/dev/null 2>&1; then
   docker-compose build tests
   docker-compose run --rm tests
 else
-  docker build -t revision-finder-tests:latest .
-  docker run --rm revision-finder-tests:latest
+  docker build -t drplcmp-tests:latest .
+  docker run --rm drplcmp-tests:latest
 fi

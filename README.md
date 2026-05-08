@@ -1,6 +1,6 @@
-# Drupal Revision Finder
+# DRPLCMP — Drupal Revision Finder
 
-`revision_finder.py` compares two `.sql` backups of a Drupal 10 database and
+`drplcmp.py` compares two `.sql` backups of a Drupal 10 database and
 reports the node IDs of a given content type that were created, modified, or
 deleted within a specified UTC datetime window.
 
@@ -9,7 +9,7 @@ Both backups are parsed by a self-contained tokenizer, which makes the tool safe
 ## Usage
 
 ```bash
-python3 revision_finder.py BACKUP_A.sql BACKUP_B.sql \
+python3 drplcmp.py BACKUP_A.sql BACKUP_B.sql \
     --type article \
     --start 2025-01-01 \
     --end   2025-01-31

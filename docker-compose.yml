@@ -1,5 +1,5 @@
 services:
   tests:
     build: .
-    image: revision-finder-tests:latest
+    image: drplcmp-tests:latest
     command: python -m pytest -v tests/
