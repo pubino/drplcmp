@@ -150,6 +150,29 @@ def test_looks_like_drupal_accepts_fixture():
     assert rf.looks_like_drupal(data)
 
 
+def test_looks_like_drupal_accepts_prefixed_tables(tmp_path):
+    # Real-world Drupal sites often install with a table prefix such as
+    # ``drup_``.  Both Drupal-fingerprint detection and node row collection
+    # must work on prefixed tables.
+    p = tmp_path / "prefixed.sql"
+    p.write_text(
+        "CREATE TABLE `drup_node_field_data` (\n"
+        "  `nid` int unsigned NOT NULL,\n"
+        "  `type` varchar(32) NOT NULL,\n"
+        "  `title` varchar(255) NOT NULL,\n"
+        "  `changed` int NOT NULL,\n"
+        "  PRIMARY KEY (`nid`)\n"
+        ");\n"
+        "INSERT INTO `drup_node_field_data` VALUES (7,'report','T',1700000000);\n"
+        "CREATE TABLE `drup_users_field_data` (`uid` int);\n"
+        "CREATE TABLE `drup_key_value` (`name` varchar(128));\n"
+    )
+    data = rf.parse_dump(p)
+    assert rf.looks_like_drupal(data)
+    rows = data.rows[rf.NODE_FIELD_DATA]
+    assert any(r["type"] == "report" and r["nid"] == 7 for r in rows)
+
+
 def test_looks_like_drupal_rejects_non_drupal(tmp_path):
     p = tmp_path / "fake.sql"
     p.write_text(

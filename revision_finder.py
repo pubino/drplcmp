@@ -56,8 +56,21 @@ DUMP_DATE_RE = re.compile(
     r"^--\s*Dump completed(?: on)?\s+(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})"
 )
 
-# Tables we extract row data for.
-TARGET_TABLES = ("node_field_data",)
+# Canonical table suffix we extract row data for.  Real-world Drupal sites
+# may install with a table prefix (e.g. ``drup_node_field_data``), so we
+# accept any table whose unprefixed name is ``node_field_data``.
+NODE_FIELD_DATA = "node_field_data"
+TARGET_TABLES = (NODE_FIELD_DATA,)
+
+
+def _is_node_field_data(table: str) -> bool:
+    """True if *table* is ``node_field_data`` with or without a prefix."""
+    return table == NODE_FIELD_DATA or table.endswith("_" + NODE_FIELD_DATA)
+
+
+def _matches_signature(table: str, signature: str) -> bool:
+    """True if *table* equals or is a prefixed form of *signature*."""
+    return table == signature or table.endswith("_" + signature)
 
 
 # ---------------------------------------------------------------------------
@@ -416,13 +429,16 @@ def parse_dump(path: Path) -> DumpData:
             if r:
                 table, rows = r
                 data.seen_tables.add(table)
-                if table in TARGET_TABLES:
-                    data.rows[table].extend(rows)
+                if _is_node_field_data(table):
+                    data.rows[NODE_FIELD_DATA].extend(rows)
     return data
 
 
 def looks_like_drupal(data: DumpData) -> bool:
-    matches = sum(1 for t in DRUPAL_SIGNATURE_TABLES if t in data.seen_tables)
+    matches = 0
+    for sig in DRUPAL_SIGNATURE_TABLES:
+        if any(_matches_signature(t, sig) for t in data.seen_tables):
+            matches += 1
     return matches >= MIN_DRUPAL_SIGNATURES
 
 
